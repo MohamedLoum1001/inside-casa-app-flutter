@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:inside_casa_app/user-interface/auth/register/RegisterScreen.dart';
 import 'package:inside_casa_app/user-interface/auth/resetPassword/ResetPasswordScreen.dart';
-import 'package:inside_casa_app/user-interface/screens/HomeScreen.dart';
+// import 'package:inside_casa_app/user-interface/screens/HomeScreen.dart';
+import 'package:inside_casa_app/user-interface/screens/homeScreen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
