@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:inside_casa_app/user-interface/auth/register/RegisterScreen.dart';
 import 'package:inside_casa_app/user-interface/auth/resetPassword/ResetPasswordScreen.dart';
+import 'package:inside_casa_app/user-interface/screens/HomeScreen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,8 +19,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // <-- Fond blanc pour toute la page
       body: Container(
-        color: Colors.white, // Fond blanc
+        color: Colors.white, // <-- Fond blanc pour le body aussi
         child: SingleChildScrollView(
           padding: const EdgeInsets.only(top: 50, bottom: 24),
           child: SafeArea(
@@ -28,14 +30,14 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset("images/LogoInsideCasa.png", height: 160),
+                  Image.asset("images/LogoInsideCasa.png", height: 130),
                   const SizedBox(height: 20),
                   Text(
                     "Bienvenue 👋",
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black, // Texte en noir
+                      color: Colors.black,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -44,19 +46,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     "Connecte-toi pour explorer Casablanca !",
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: Colors.black54, // Texte gris foncé
+                      color: Colors.black54,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 30),
-
                   _buildInput(
                     controller: emailCtrl,
                     hintText: "Adresse email",
                     icon: Icons.email_outlined,
                   ),
                   const SizedBox(height: 16),
-
                   _buildInput(
                     controller: passwordCtrl,
                     hintText: "Mot de passe",
@@ -68,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       setState(() => showPassword = !showPassword);
                     },
                   ),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -79,56 +78,67 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         "Mot de passe oublié ?",
                         style: GoogleFonts.poppins(
-                          color: Colors.blue, // Texte bleu
+                          color: Colors.black,
                         ),
                       ),
                     ),
                   ),
+                  // ...existing code...
                   const SizedBox(height: 20),
-
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4285F4), // Bleu Google
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HomeScreen(),
+                        ),
                       ),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      "Connexion",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white, // Texte blanc
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFfdcf00), // Jaune
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Pas encore de compte ?",
+                      child: Text(
+                        "Connexion",
                         style: GoogleFonts.poppins(
-                          color: Colors.black, // Texte en noir
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const RegisterScreen())),
-                        child: Text(
-                          "Créer un compte",
-                          style: GoogleFonts.poppins(
-                            color: Colors.blue, // Texte bleu
-                          ),
-                        ),
-                      )
-                    ],
+                    ),
                   ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RegisterScreen(),
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFff5609), // Orange
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: Text(
+                        "Créer un compte",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+// ...existing code...
                 ],
               ),
             ),
@@ -151,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all( // Ajout de la bordure
+        border: Border.all(
           color: Colors.grey[300]!,
           width: 1,
         ),
@@ -171,12 +181,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 )
               : null,
           hintText: hintText,
-          border: InputBorder.none, // Garde le border none pour le TextField
-          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
         ),
         style: GoogleFonts.poppins(
           fontSize: 14,
-          color: Colors.black, // Texte en noir
+          color: Colors.black,
         ),
       ),
     );
