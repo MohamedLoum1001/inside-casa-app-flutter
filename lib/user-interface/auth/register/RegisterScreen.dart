@@ -55,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => isLoading = true);
 
-    final url = Uri.parse("https://localhost:5000/api/auth/register"); // Remplace l'URL par ta vraie API
+    final url = Uri.parse("https://localhost:5000/api/auth/register");
 
     try {
       final response = await http.post(
