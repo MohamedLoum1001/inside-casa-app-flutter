@@ -1,0 +1,49 @@
+name: DevSecOps CI/CD - Flutter App
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  flutter-security:
+    name: Analyse de sécurité Flutter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cloner le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.6' # adapte à ta version Flutter
+
+      - name: Vérifier la version de Flutter
+        run: flutter --version
+
+      - name: Récupérer les dépendances
+        run: flutter pub get
+
+      - name: Analyse statique du code (flutter analyze)
+        run: flutter analyze > flutter-analyze-report.txt || true
+
+      - name: Lancer les tests unitaires
+        run: flutter test --machine > flutter-test-report.json || true
+
+      - name: Scan des secrets (Gitleaks)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks-linux-amd64 -o gitleaks
+          chmod +x gitleaks
+          ./gitleaks detect --source . --report-path=gitleaks-report.json || true
+
+      - name: Upload des rapports
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-flutter-devsecops
+          path: |
+            flutter-analyze-report.txt
+            flutter-test-report.json
+            gitleaks-report.json
