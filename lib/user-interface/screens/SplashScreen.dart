@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:inside_casa_app/user-interface/auth/login/LoginScreen.dart';
-import 'package:inside_casa_app/user-interface/screens/PartnerHomeScreen.dart';
-import 'package:inside_casa_app/user-interface/screens/homeScreen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// ignore_for_file: file_names
 
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:inside_casa_app/user-interface/services/authService.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,43 +13,75 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final AuthService _authService = AuthService();
+
   @override
   void initState() {
     super.initState();
-    _checkLogin();
+    _checkLoginStatus();
   }
 
-  Future<void> _checkLogin() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    final role = prefs.getString('role');
+  Future<void> _checkLoginStatus() async {
+    // Affiche le splash screen pendant 3 secondes
+    await Future.delayed(const Duration(seconds: 3));
 
-    await Future.delayed(const Duration(seconds: 2));
+    final token = await _authService.getToken();
 
-    if (token != null) {
-      if (role == 'partner') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+    if (token == null) {
+      // Pas de token => page de connexion
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
+    // Vérifie que le token JWT a bien 3 parties
+    final parts = token.split('.');
+    if (parts.length != 3) {
+      // Token invalide => suppression et retour login
+      await _authService.deleteToken();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
+    try {
+      final payloadBase64 = parts[1];
+      final normalized = base64.normalize(payloadBase64);
+      final payloadString = utf8.decode(base64.decode(normalized));
+      final payload = jsonDecode(payloadString);
+
+      final role = payload['role'];
+      if (role == 'customer') {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/homeCustomer');
+      } else if (role == 'partner') {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/homePartner');
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const PartnerHomeScreen()),
-        );
+        // Rôle inconnu => suppression token et retour login
+        await _authService.deleteToken();
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/login');
       }
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+    } catch (e) {
+      // En cas d'erreur dans le décodage, suppression token et retour login
+      await _authService.deleteToken();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Image.asset(
+          'images/LogoInsideCasa.png',
+          width: 150,
+          height: 150,
+        ),
+      ),
     );
   }
 }

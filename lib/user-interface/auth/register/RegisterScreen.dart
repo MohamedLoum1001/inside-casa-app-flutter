@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -11,205 +9,227 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final fullnameCtrl = TextEditingController();
+  final prenomCtrl = TextEditingController();
+  final nomCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
   final confirmCtrl = TextEditingController();
-  final phoneCtrl = TextEditingController();
 
-  bool isLoading = false;
   bool showPassword = false;
   bool showConfirmPassword = false;
-  String selectedRole = 'customer';
-
-  @override
-  void dispose() {
-    fullnameCtrl.dispose();
-    emailCtrl.dispose();
-    passwordCtrl.dispose();
-    confirmCtrl.dispose();
-    phoneCtrl.dispose();
-    super.dispose();
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> registerUser() async {
-    final String fullname = fullnameCtrl.text.trim();
-    final String email = emailCtrl.text.trim();
-    final String password = passwordCtrl.text.trim();
-    final String confirmPassword = confirmCtrl.text.trim();
-    final String phone = phoneCtrl.text.trim();
-
-    if ([fullname, email, password, confirmPassword, phone].any((e) => e.isEmpty)) {
-      _showMessage("Veuillez remplir tous les champs.");
-      return;
-    }
-
-    if (password != confirmPassword) {
-      _showMessage("Les mots de passe ne correspondent pas.");
-      return;
-    }
-
-    setState(() => isLoading = true);
-
-    final url = Uri.parse("https://localhost:5000/api/auth/register");
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "fullname": fullname,
-          "email": email,
-          "password": password,
-          "phone": phone,
-          "role": selectedRole,
-          "description": ""
-        }),
-      );
-
-      setState(() => isLoading = false);
-
-      if (response.statusCode == 201) {
-        _showMessage("Inscription réussie !");
-        Navigator.pushReplacementNamed(context, '/login');
-      } else {
-        final error = jsonDecode(response.body);
-        _showMessage("Erreur : ${error['message'] ?? 'Inscription échouée.'}");
-      }
-    } catch (e) {
-      setState(() => isLoading = false);
-      _showMessage("Erreur réseau : ${e.toString()}");
-    }
-  }
-
-  Widget buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool obscure = false,
-    bool toggleVisible = false,
-    VoidCallback? onToggle,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        suffixIcon: toggleVisible
-            ? IconButton(
-                icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                onPressed: onToggle,
-              )
-            : null,
-        hintText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-    );
-  }
+  String selectedRole = 'Utilisateur';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff9f9f9),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              Image.asset("images/LogoInsideCasa.png", height: 130),
-              const SizedBox(height: 20),
-
-              Text(
-                "Créer un compte",
-                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-
-              DropdownButtonFormField<String>(
-                value: selectedRole,
-                decoration: InputDecoration(
-                  labelText: "Rôle",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: Colors.white,
+      backgroundColor: Colors.white, // Fond blanc pour toute la page
+      body: Container(
+        color: Colors.white, // Fond blanc pour le body aussi
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Image.asset("images/LogoInsideCasa.png", height: 130),
+               
+                Text(
+                  "Créer un compte ✨",
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'customer', child: Text('Utilisateur')),
-                  DropdownMenuItem(value: 'partner', child: Text('Partenaire')),
-                ],
-                onChanged: (value) {
-                  setState(() => selectedRole = value!);
-                },
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                Text(
+                  "Inscris-toi pour découvrir Casablanca !",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
 
-              buildTextField(controller: fullnameCtrl, label: "Nom complet", icon: Icons.person),
-              const SizedBox(height: 12),
+                // Sélecteur de rôle
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 1,
+                    ),
+                  ),
+                  child: DropdownButton<String>(
+                    value: selectedRole,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Utilisateur',
+                        child: Text('Utilisateur'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Partenaire',
+                        child: Text('Partenaire'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        selectedRole = value!;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
 
-              buildTextField(controller: emailCtrl, label: "Email", icon: Icons.email),
-              const SizedBox(height: 12),
+                // Prénom
+                _buildInput(
+                  controller: prenomCtrl,
+                  hintText: "Prénom & Nom",
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 8),
 
-              buildTextField(controller: phoneCtrl, label: "Téléphone", icon: Icons.phone),
-              const SizedBox(height: 12),
+                // Email
+                _buildInput(
+                  controller: emailCtrl,
+                  hintText: "Adresse email",
+                  icon: Icons.email_outlined,
+                ),
+                const SizedBox(height: 8),
 
-              buildTextField(
-                controller: passwordCtrl,
-                label: "Mot de passe",
-                icon: Icons.lock,
-                obscure: !showPassword,
-                toggleVisible: true,
-                onToggle: () => setState(() => showPassword = !showPassword),
-              ),
-              const SizedBox(height: 12),
+                // Mot de passe
+                _buildInput(
+                  controller: passwordCtrl,
+                  hintText: "Mot de passe",
+                  obscureText: !showPassword,
+                  icon: Icons.lock_outline,
+                  toggleVisibility: () {
+                    setState(() => showPassword = !showPassword);
+                  },
+                  isPassword: true,
+                  isVisible: showPassword,
+                ),
+                const SizedBox(height: 8),
 
-              buildTextField(
-                controller: confirmCtrl,
-                label: "Confirmer le mot de passe",
-                icon: Icons.lock_outline,
-                obscure: !showConfirmPassword,
-                toggleVisible: true,
-                onToggle: () => setState(() => showConfirmPassword = !showConfirmPassword),
-              ),
-              const SizedBox(height: 20),
+                // Confirmation
+                _buildInput(
+                  controller: confirmCtrl,
+                  hintText: "Confirmer le mot de passe",
+                  obscureText: !showConfirmPassword,
+                  icon: Icons.lock_outline,
+                  toggleVisibility: () {
+                    setState(() => showConfirmPassword = !showConfirmPassword);
+                  },
+                  isPassword: true,
+                  isVisible: showConfirmPassword,
+                ),
+                const SizedBox(height: 13),
 
-              isLoading
-                  ? const CircularProgressIndicator()
-                  : SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: registerUser,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFfdcf00),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(
-                          "S'inscrire",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                // ...existing code...
+                const SizedBox(height: 13),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFfdcf00), // Jaune
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 5,
+                    ),
+                    child: Text(
+                      "S'inscrire",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 10),
 
-              const SizedBox(height: 12),
-
-              TextButton(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-                child: Text("Déjà un compte ? Se connecter", style: GoogleFonts.poppins()),
-              ),
-            ],
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFff5609), // Orange
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: Text(
+                      "Se connecter",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+// ...existing code...
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInput({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    bool obscureText = false,
+    bool isPassword = false,
+    bool isVisible = false,
+    VoidCallback? toggleVisibility,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey[300]!,
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: Colors.grey[600]),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    isVisible ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey,
+                  ),
+                  onPressed: toggleVisibility,
+                )
+              : null,
+          hintText: hintText,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+        ),
+        style: GoogleFonts.poppins(fontSize: 14, color: Colors.black),
       ),
     );
   }
