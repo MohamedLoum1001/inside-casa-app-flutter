@@ -20,7 +20,7 @@ class InsideCasaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       // Le splash screen est la page d'accueil
-      initialRoute: '/',
+      initialRoute: '/login',
       routes: {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
