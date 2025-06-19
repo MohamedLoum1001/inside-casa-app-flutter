@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:inside_casa_app/user-interface/screens/ActivitiesScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/CategoriesScreen.dart';
+import 'package:inside_casa_app/user-interface/screens/EvenementsScreen.dart';
 // import 'package:inside_casa_app/user-interface/screens/EvenementsScreen.dart';
 // import 'package:inside_casa_app/user-interface/screens/RestaurantsScreen.dart';
 
@@ -152,8 +153,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     switch (selectedCategory) {
       case 0:
         return ActivitiesScreen(filter: searchQuery);
-      // case 1:
-      //   return EvenementsScreen(filter: searchQuery);
+      case 1:
+        return EvenementsScreen(filter: searchQuery);
       // case 2:
       //   return RestaurantsScreen(filter: searchQuery);
       case 3:
