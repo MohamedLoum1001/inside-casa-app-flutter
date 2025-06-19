@@ -1,17 +1,24 @@
+// ignore_for_file: use_build_context_synchronously, depend_on_referenced_packages, prefer_const_constructors, duplicate_ignore
+
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({Key? key}) : super(key: key);
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final prenomCtrl = TextEditingController();
-  final nomCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  final fullnameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
+  final phoneCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
   final confirmCtrl = TextEditingController();
 
@@ -19,28 +26,114 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool showConfirmPassword = false;
   String selectedRole = 'Utilisateur';
 
+  bool isLoading = false;
+
+  final RegExp emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+  final RegExp phoneRegex = RegExp(r'^0(6|7|5|8|9)\d{8}$');
+
+  Future<void> registerUser() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    final fullname = fullnameCtrl.text.trim();
+    final email = emailCtrl.text.trim();
+    final phone = phoneCtrl.text.trim();
+    final password = passwordCtrl.text;
+    final role = selectedRole == 'Utilisateur' ? 'customer' : 'partner';
+
+    try {
+      final response = await http.post(
+        Uri.parse("https://insidecasa.me/api/auth/register"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "fullname": fullname,
+          "email": email,
+          "password": password,
+          "phone":
+              "+212${phone.substring(1)}", // on enlève le 0 initial et on ajoute +212
+          "role": role,
+        }),
+      );
+
+      print('Status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+
+        // Supposons que le serveur renvoie un champ 'id' dans la réponse (sinon on affiche message)
+        final userId = responseData['id'];
+        if (userId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('user_id', userId);
+          print('✅ Inscription réussie !');
+          print('ID: $userId');
+          print('Nom complet: $fullname');
+          print('Email: $email');
+          print('Mot de passe: $password');
+          print('Confirmation mot de passe: ${confirmCtrl.text}');
+        } else {
+          print('❌ ID manquant dans la réponse.');
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Inscription réussie ✅")),
+        );
+
+        await Future.delayed(const Duration(seconds: 3)); // loader 3s
+        Navigator.pop(context);
+      } else {
+        final error = jsonDecode(response.body);
+        print('❌ Erreur serveur : ${error['message'] ?? 'Erreur inconnue'}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur : ${error['message'] ?? 'Inconnue'}")),
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur réseau : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur réseau : $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    fullnameCtrl.dispose();
+    emailCtrl.dispose();
+    phoneCtrl.dispose();
+    passwordCtrl.dispose();
+    confirmCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Fond blanc pour toute la page
-      body: Container(
-        color: Colors.white, // Fond blanc pour le body aussi
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Form(
+            key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Image.asset("images/LogoInsideCasa.png", height: 130),
-               
                 Text(
                   "Créer un compte ✨",
                   style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
                   ),
-                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -49,130 +142,169 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     fontSize: 14,
                     color: Colors.black54,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 15),
-
-                // Sélecteur de rôle
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey[300]!,
-                      width: 1,
-                    ),
-                  ),
-                  child: DropdownButton<String>(
-                    value: selectedRole,
-                    isExpanded: true,
-                    underline: const SizedBox(),
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Utilisateur',
-                        child: Text('Utilisateur'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Partenaire',
-                        child: Text('Partenaire'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        selectedRole = value!;
-                      });
-                    },
-                  ),
+                const SizedBox(height: 20),
+                _buildDropdown(),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: fullnameCtrl,
+                  decoration:
+                      _inputDecoration("Nom complet", Icons.person_outline),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Le nom complet est requis";
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 8),
-
-                // Prénom
-                _buildInput(
-                  controller: prenomCtrl,
-                  hintText: "Prénom & Nom",
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 8),
-
-                // Email
-                _buildInput(
+                const SizedBox(height: 10),
+                TextFormField(
                   controller: emailCtrl,
-                  hintText: "Adresse email",
-                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration:
+                      _inputDecoration("Adresse email", Icons.email_outlined),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "L'email est requis";
+                    }
+                    if (!emailRegex.hasMatch(value.trim())) {
+                      return "Email invalide";
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 8),
-
-                // Mot de passe
-                _buildInput(
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        "+212",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        decoration:
+                            _inputDecoration("Téléphone", Icons.phone_outlined)
+                                .copyWith(
+                          counterText: "",
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return "Le téléphone est requis";
+                          }
+                          if (!phoneRegex.hasMatch(value.trim())) {
+                            return "Numéro invalide (ex: 0612345678)";
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
                   controller: passwordCtrl,
-                  hintText: "Mot de passe",
                   obscureText: !showPassword,
-                  icon: Icons.lock_outline,
-                  toggleVisibility: () {
-                    setState(() => showPassword = !showPassword);
+                  decoration:
+                      _inputDecoration("Mot de passe", Icons.lock_outline)
+                          .copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => showPassword = !showPassword),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Le mot de passe est requis";
+                    }
+                    if (value.length < 6) {
+                      return "Le mot de passe doit contenir au moins 6 caractères";
+                    }
+                    return null;
                   },
-                  isPassword: true,
-                  isVisible: showPassword,
                 ),
-                const SizedBox(height: 8),
-
-                // Confirmation
-                _buildInput(
+                const SizedBox(height: 10),
+                TextFormField(
                   controller: confirmCtrl,
-                  hintText: "Confirmer le mot de passe",
                   obscureText: !showConfirmPassword,
-                  icon: Icons.lock_outline,
-                  toggleVisibility: () {
-                    setState(() => showConfirmPassword = !showConfirmPassword);
+                  decoration: _inputDecoration(
+                          "Confirmer le mot de passe", Icons.lock_outline)
+                      .copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(showConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => setState(
+                          () => showConfirmPassword = !showConfirmPassword),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "La confirmation est requise";
+                    }
+                    if (value != passwordCtrl.text) {
+                      return "Les mots de passe ne correspondent pas";
+                    }
+                    return null;
                   },
-                  isPassword: true,
-                  isVisible: showConfirmPassword,
                 ),
-                const SizedBox(height: 13),
-
-                // ...existing code...
-                const SizedBox(height: 13),
-
+                const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: isLoading ? null : registerUser,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFfdcf00), // Jaune
+                      backgroundColor:
+                          isLoading ? Colors.grey : const Color(0xFFfdcf00),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 5,
                     ),
-                    child: Text(
-                      "S'inscrire",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : Text(
+                            "S'inscrire",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 10),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFff5609), // Orange
+                      backgroundColor: const Color(0xFFff5609),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 2,
                     ),
                     child: Text(
                       "Se connecter",
@@ -183,7 +315,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                 ),
-// ...existing code...
               ],
             ),
           ),
@@ -192,44 +323,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildInput({
-    required TextEditingController controller,
-    required String hintText,
-    required IconData icon,
-    bool obscureText = false,
-    bool isPassword = false,
-    bool isVisible = false,
-    VoidCallback? toggleVisibility,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+  InputDecoration _inputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      prefixIcon: Icon(icon),
+      hintText: hint,
+      border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[300]!,
-          width: 1,
-        ),
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: Colors.grey[600]),
-          suffixIcon: isPassword
-              ? IconButton(
-                  icon: Icon(
-                    isVisible ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey,
-                  ),
-                  onPressed: toggleVisibility,
-                )
-              : null,
-          hintText: hintText,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-        ),
-        style: GoogleFonts.poppins(fontSize: 14, color: Colors.black),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: DropdownButton<String>(
+        value: selectedRole,
+        isExpanded: true,
+        underline: const SizedBox(),
+        items: const [
+          DropdownMenuItem(value: 'Utilisateur', child: Text('Utilisateur')),
+          DropdownMenuItem(value: 'Partenaire', child: Text('Partenaire')),
+        ],
+        onChanged: (value) {
+          setState(() {
+            selectedRole = value!;
+          });
+        },
       ),
     );
   }
