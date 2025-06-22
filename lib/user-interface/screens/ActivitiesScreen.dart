@@ -45,7 +45,6 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Appliquer le filtre sur la liste des activités
     final filteredActivities = widget.filter.isEmpty
         ? activities
         : activities.where((act) {
@@ -68,10 +67,10 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                   itemCount: filteredActivities.length,
                   itemBuilder: (_, index) {
                     final act = filteredActivities[index];
-                    final imageUrl =
-                        act['image_urls'] != null && act['image_urls'].isNotEmpty
-                            ? act['image_urls'][0]
-                            : 'https://via.placeholder.com/100';
+                    final imageUrl = act['image_urls'] != null &&
+                            act['image_urls'].isNotEmpty
+                        ? act['image_urls'][0]
+                        : 'https://via.placeholder.com/400x200';
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
@@ -90,82 +89,56 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                             ),
                           );
                         },
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ClipRRect(
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(16),
-                                bottomLeft: Radius.circular(16),
-                              ),
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(16)),
                               child: Image.network(
                                 imageUrl,
-                                width: 100,
-                                height: 100,
+                                width: double.infinity,
+                                height: 180,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) =>
                                     const Icon(Icons.image, size: 80),
                               ),
                             ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      act['title'] ?? '',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Color(0xFF22223B),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    act['title'] ?? '',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: Color(0xFF22223B),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.location_on,
-                                            size: 16, color: Color(0xFFfdcf00)),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            act['location'] ?? '',
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black54),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.timer,
-                                            color: Colors.grey),
-                                        const SizedBox(width: 6),
-                                        Text("${act['duration']} min"),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.attach_money,
-                                            color: Colors.green),
-                                        const SizedBox(width: 6),
-                                        Text("${act['price']} MAD"),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.timer,
+                                          color: Colors.grey),
+                                      const SizedBox(width: 6),
+                                      Text("${act['duration']} min"),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.attach_money,
+                                          color: Colors.green),
+                                      const SizedBox(width: 6),
+                                      Text("${act['price']} MAD"),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.only(right: 10),
-                              child: Icon(Icons.arrow_forward_ios,
-                                  size: 16, color: Color(0xFFfdcf00)),
                             ),
                           ],
                         ),
