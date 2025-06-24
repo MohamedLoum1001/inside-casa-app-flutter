@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously, file_names, depend_on_referenced_packages
+// ignore_for_file: use_build_context_synchronously, file_names, depend_on_referenced_packages, prefer_const_constructors
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -19,64 +19,64 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
-
   bool showPassword = false;
   bool isLoading = false;
 
-  final storage = FlutterSecureStorage();
+  // Configuration du stockage sécurisé
+  final FlutterSecureStorage secureStorage = FlutterSecureStorage();
   final RegExp emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
 
   Future<void> login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final email = emailCtrl.text.trim();
-    final password = passwordCtrl.text;
-
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final response = await http.post(
         Uri.parse('https://insidecasa.me/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode(
+            {'email': emailCtrl.text.trim(), 'password': passwordCtrl.text}),
       );
 
+      final data = jsonDecode(response.body);
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final token = data['token'];
+        // Sauvegarde du token dans le stockage sécurisé
+        await secureStorage.write(
+            key: 'jwt_token',
+            value: data['token'],
+            aOptions: _getAndroidOptions());
 
-        await storage.write(key: 'jwt_token', value: token);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Connexion réussie ✅")),
-        );
-
+        // Navigation vers l'écran d'accueil
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Connexion réussie ✅")),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Email ou mot de passe incorrect")),
+          SnackBar(content: Text(data['message'] ?? "Échec de la connexion")),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur : ${e.toString()}")),
+        SnackBar(content: Text("Erreur: ${e.toString()}")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
+
+  // Options de sécurité pour Android
+  AndroidOptions _getAndroidOptions() => const AndroidOptions(
+        encryptedSharedPreferences: true,
+      );
 
   @override
   void dispose() {
