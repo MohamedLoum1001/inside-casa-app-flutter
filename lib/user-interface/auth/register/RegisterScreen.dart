@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -14,7 +13,6 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _uuid = Uuid();
 
   final fullnameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
@@ -24,28 +22,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool showPassword = false;
   bool showConfirmPassword = false;
-  String selectedRole = 'Utilisateur';
   bool isLoading = false;
+  String selectedRole = 'Utilisateur';
 
   final RegExp emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-  final RegExp phoneRegex = RegExp(r'^0[5-7][0-9]{8}$'); // Correction ici
+  final RegExp phoneRegex = RegExp(r'^0[5-7][0-9]{8}$');
 
   Future<void> registerUser() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => isLoading = true);
 
-    try {
-      final userId = _uuid.v4();
-      final userData = {
-        'user_id': userId,
-        'fullname': fullnameCtrl.text.trim(),
-        'email': emailCtrl.text.trim(),
-        'phone': '+212${phoneCtrl.text.trim().substring(1)}',
-        'password': passwordCtrl.text,
-        'role': selectedRole == 'Utilisateur' ? 'customer' : 'partner',
-      };
+    final userData = {
+      'fullname': fullnameCtrl.text.trim(),
+      'email': emailCtrl.text.trim(),
+      'phone': '+212${phoneCtrl.text.trim().substring(1)}',
+      'password': passwordCtrl.text.trim(),
+      'role': selectedRole == 'Utilisateur' ? 'customer' : 'partner',
+    };
 
+    try {
       final response = await http.post(
         Uri.parse('https://insidecasa.me/api/auth/register'),
         headers: {'Content-Type': 'application/json'},
@@ -54,22 +49,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 201) {
-        final token = responseData['token'];
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final userId = responseData['userId'];
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_id', userId);
-        await prefs.setString('user_token', token);
+        await prefs.setInt('user_id', userId);
         await prefs.setString('user_data', jsonEncode(userData));
-
-        debugPrint('════════════════ INSCRIPTION RÉUSSIE ════════════════');
-        debugPrint('ID: $userId');
-        debugPrint('Nom: ${userData['fullname']}');
-        debugPrint('Email: ${userData['email']}');
-        debugPrint('Téléphone: ${userData['phone']}');
-        debugPrint('Rôle: ${userData['role']}');
-        debugPrint('Token: $token');
-        debugPrint('═════════════════════════════════════════════════════');
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Inscription réussie ✅')),
@@ -78,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) Navigator.pop(context);
       } else {
+        debugPrint("Erreur: ${response.statusCode} => $responseData");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content:
@@ -103,35 +89,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  InputDecoration _inputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      prefixIcon: Icon(icon),
+      hintText: hint,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
               children: [
                 Image.asset("images/LogoInsideCasa.png", height: 130),
                 const SizedBox(height: 12),
-                Text(
-                  "Créer un compte ✨",
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text("Créer un compte ✨",
+                    style: GoogleFonts.poppins(
+                        fontSize: 24, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(
-                  "Inscris-toi pour découvrir Casablanca !",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
+                Text("Inscris-toi pour découvrir Casablanca !",
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, color: Colors.black54)),
                 const SizedBox(height: 20),
+
+                // Rôle
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -151,22 +140,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onChanged: (value) => setState(() => selectedRole = value!),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Nom complet
                 TextFormField(
                   controller: fullnameCtrl,
-                  decoration:
-                      _inputDecoration("Nom complet", Icons.person_outline),
+                  decoration: _inputDecoration("Nom complet", Icons.person),
                   validator: (value) =>
                       value!.isEmpty ? 'Champ obligatoire' : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Email
                 TextFormField(
                   controller: emailCtrl,
-                  decoration: _inputDecoration("Email", Icons.email_outlined),
+                  decoration: _inputDecoration("Email", Icons.email),
                   validator: (value) =>
                       !emailRegex.hasMatch(value!) ? 'Email invalide' : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Téléphone
                 Row(
                   children: [
                     Container(
@@ -185,31 +179,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: phoneCtrl,
                         keyboardType: TextInputType.phone,
                         maxLength: 10,
-                        decoration:
-                            _inputDecoration("Téléphone", Icons.phone_outlined)
-                                .copyWith(
-                          counterText: "",
-                        ),
+                        decoration: _inputDecoration("Téléphone", Icons.phone)
+                            .copyWith(counterText: ""),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
+                          if (value == null || value.isEmpty)
                             return "Le téléphone est requis";
-                          }
-                          if (!phoneRegex.hasMatch(value)) {
+                          if (!phoneRegex.hasMatch(value))
                             return "Format: 05/06/07XXXXXXXX";
-                          }
                           return null;
                         },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Mot de passe
                 TextFormField(
                   controller: passwordCtrl,
                   obscureText: !showPassword,
                   decoration:
-                      _inputDecoration("Mot de passe", Icons.lock_outline)
-                          .copyWith(
+                      _inputDecoration("Mot de passe", Icons.lock).copyWith(
                     suffixIcon: IconButton(
                       icon: Icon(showPassword
                           ? Icons.visibility_off
@@ -221,7 +211,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (value) =>
                       value!.length < 6 ? 'Minimum 6 caractères' : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Confirmation mot de passe
                 TextFormField(
                   controller: confirmCtrl,
                   obscureText: !showConfirmPassword,
@@ -240,7 +232,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ? 'Mots de passe différents'
                       : null,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+
+                // Bouton s'inscrire
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -250,8 +244,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           isLoading ? Colors.grey : const Color(0xFFfdcf00),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     child: isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
@@ -261,7 +254,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+
+                // Bouton se connecter
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -270,8 +265,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       backgroundColor: const Color(0xFFff5609),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text("Se connecter",
                         style: GoogleFonts.poppins(
@@ -283,17 +277,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String hint, IconData icon) {
-    return InputDecoration(
-      prefixIcon: Icon(icon),
-      hintText: hint,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
     );
   }
 }

@@ -1,10 +1,10 @@
-// ignore_for_file: use_build_context_synchronously, file_names, depend_on_referenced_packages, prefer_const_constructors
+// ignore_for_file: use_build_context_synchronously, file_names
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:inside_casa_app/user-interface/auth/register/RegisterScreen.dart';
 import 'package:inside_casa_app/user-interface/auth/resetPassword/ResetPasswordScreen.dart';
@@ -24,40 +24,42 @@ class _LoginScreenState extends State<LoginScreen> {
   bool showPassword = false;
   bool isLoading = false;
 
-  // Configuration du stockage sécurisé
-  final FlutterSecureStorage secureStorage = FlutterSecureStorage();
   final RegExp emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
 
   Future<void> login() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => isLoading = true);
 
     try {
       final response = await http.post(
         Uri.parse('https://insidecasa.me/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(
-            {'email': emailCtrl.text.trim(), 'password': passwordCtrl.text}),
+        body: jsonEncode({
+          'email': emailCtrl.text.trim(),
+          'password': passwordCtrl.text.trim(),
+        }),
       );
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        // Sauvegarde du token dans le stockage sécurisé
-        await secureStorage.write(
-            key: 'jwt_token',
-            value: data['token'],
-            aOptions: _getAndroidOptions());
+      if (response.statusCode == 200 && data['token'] != null) {
+        final token = data['token'];
 
-        // Navigation vers l'écran d'accueil
+        // ✅ Affichage du token dans la console
+        debugPrint('🎯 TOKEN JWT: $token');
+
+        // ✅ Enregistrement du token dans SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('jwt_token', token);
+
+        // Navigation vers la page d’accueil
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Connexion réussie ✅")),
+          const SnackBar(content: Text("Connexion réussie ✅")),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,23 +68,29 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur: ${e.toString()}")),
+        SnackBar(content: Text("Erreur réseau: ${e.toString()}")),
       );
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
-  // Options de sécurité pour Android
-  AndroidOptions _getAndroidOptions() => const AndroidOptions(
-        encryptedSharedPreferences: true,
-      );
-
   @override
   void dispose() {
     emailCtrl.dispose();
     passwordCtrl.dispose();
     super.dispose();
+  }
+
+  InputDecoration _inputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      prefixIcon: Icon(icon),
+      hintText: hint,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+    );
   }
 
   @override
@@ -228,17 +236,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String hint, IconData icon) {
-    return InputDecoration(
-      prefixIcon: Icon(icon),
-      hintText: hint,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
     );
   }
 }

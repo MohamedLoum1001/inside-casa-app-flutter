@@ -1,5 +1,7 @@
 // ignore_for_file: file_names
 import 'package:flutter/material.dart';
+import 'package:inside_casa_app/user-interface/screens/ReservationsScreen.dart';
+
 
 class ActivityDetailsScreen extends StatelessWidget {
   final Map activity;
@@ -53,18 +55,17 @@ class ActivityDetailsScreen extends StatelessWidget {
               Text("${activity['price']} MAD"),
             ],
           ),
-
           const SizedBox(height: 24),
 
-          // Bouton Réserver
+          // ✅ Bouton Réserver avec navigation
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Réservation pour "${activity['title']}" prise en compte !'),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReservationScreen(activity: activity),
                   ),
                 );
               },
