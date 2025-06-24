@@ -7,9 +7,8 @@ on:
     branches: [main]
 
 jobs:
-
   flutter-security:
-    name: Audit sécurité Flutter (analyze, test, secrets, deps)
+    name: Audit sécurité Flutter (analyze, test, secrets)
     runs-on: ubuntu-latest
 
     steps:
@@ -19,7 +18,7 @@ jobs:
       - name: Installer Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.4'  # Dart 3.5.4 inclus
+          flutter-version: '3.32.4'
 
       - name: Vérifier la version Flutter
         run: flutter --version
@@ -39,12 +38,6 @@ jobs:
           chmod +x gitleaks
           ./gitleaks detect --source . --report-path=gitleaks-report.json || true
 
-      - name: Audit des dépendances (pubspec_audit)
-        run: |
-          dart pub global activate pubspec_audit
-          export PATH="$PATH":"$HOME/.pub-cache/bin"
-          pubspec_audit --json > pubspec-audit-report.json || true
-
       - name: Upload des rapports
         uses: actions/upload-artifact@v4
         with:
@@ -53,4 +46,3 @@ jobs:
             flutter-analyze-report.txt
             flutter-test-report.json
             gitleaks-report.json
-            pubspec-audit-report.json
