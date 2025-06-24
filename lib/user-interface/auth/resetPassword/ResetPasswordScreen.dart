@@ -1,18 +1,100 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:inside_casa_app/user-interface/auth/login/LoginScreen.dart';
+// import 'package:inside_casa_app/user-interface/auth/login/LoginScreen.dart';
 
-class ResetPasswordScreen extends StatelessWidget {
+class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final emailCtrl = TextEditingController();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
 
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final emailCtrl = TextEditingController();
+  bool isLoading = false;
+
+  Future<void> sendResetLink() async {
+    final email = emailCtrl.text.trim();
+    if (email.isEmpty) {
+      _showDialog("Erreur", "Veuillez entrer votre adresse email.");
+      return;
+    }
+    setState(() {
+      isLoading = true;
+    });
+
+    final url = Uri.parse('https://ton-api.com/api/auth/reset-password'); // Remplace par ton URL API
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+
+      setState(() {
+        isLoading = false;
+      });
+
+      if (response.statusCode == 200) {
+        _showDialog(
+          "Succès",
+          "Un lien de réinitialisation a été envoyé à votre adresse email.",
+          onConfirm: () {
+            Navigator.pop(context); // Fermer la popup
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
+          },
+        );
+      } else {
+        final body = jsonDecode(response.body);
+        final message = body['message'] ?? "Une erreur est survenue.";
+        _showDialog("Erreur", message);
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      _showDialog("Erreur", "Erreur réseau : $e");
+    }
+  }
+
+  void _showDialog(String title, String message, {VoidCallback? onConfirm}) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              if (onConfirm != null) onConfirm();
+            },
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    emailCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Fond blanc pour toute la page
+      backgroundColor: Colors.white,
       body: Container(
-        color: Colors.white, // Fond blanc pour le body aussi
+        color: Colors.white,
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -40,7 +122,6 @@ class ResetPasswordScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 30),
-
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -52,6 +133,7 @@ class ResetPasswordScreen extends StatelessWidget {
                   ),
                   child: TextField(
                     controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
                       hintText: "Adresse email",
@@ -61,42 +143,40 @@ class ResetPasswordScreen extends StatelessWidget {
                     style: GoogleFonts.poppins(fontSize: 14, color: Colors.black),
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // logique future
-                    },
+                    onPressed: isLoading ? null : sendResetLink,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFfdcf00), // Jaune
+                      backgroundColor: const Color(0xFFfdcf00),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 5,
                     ),
-                    child: Text(
-                      "Envoyer le lien",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                            "Envoyer le lien",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 30),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.push(
+                    onPressed: () => Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFff5609), // Orange
+                      backgroundColor: const Color(0xFFff5609),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
