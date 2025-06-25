@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:inside_casa_app/user-interface/auth/register/RegisterScreen.dart';
@@ -44,13 +45,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200 && data['token'] != null) {
         final token = data['token'];
+        final user = data['user'];
 
-        // ✅ Affichage du token dans la console
         debugPrint('🎯 TOKEN JWT: $token');
+        debugPrint('👤 USER ID: ${user['id']}');
 
-        // ✅ Enregistrement du token dans SharedPreferences
+        // Stockage sécurisé dans FlutterSecureStorage
+        final secureStorage = FlutterSecureStorage();
+        await secureStorage.write(key: 'jwt_token', value: token);
+
+        // Stockage standard dans SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', token);
+        await prefs.setInt('user_id', user['id']); // 👈 Ajout important
 
         // Navigation vers la page d’accueil
         Navigator.pushReplacement(

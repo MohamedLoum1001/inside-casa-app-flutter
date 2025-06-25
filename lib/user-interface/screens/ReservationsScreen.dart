@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class ReservationScreen extends StatefulWidget {
@@ -16,19 +17,45 @@ class ReservationScreen extends StatefulWidget {
 
 class _ReservationScreenState extends State<ReservationScreen> {
   final storage = FlutterSecureStorage();
-  DateTime? selectedDate;
   bool isSubmitting = false;
   String errorMessage = '';
+  String? jwtToken;
+  int? userId;
+  int numberOfPeople = 1;
+  double totalPrice = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    loadTokenAndUserId();
+    updateTotalPrice();
+  }
+
+  void updateTotalPrice() {
+    final priceString = widget.activity['price']?.toString() ?? "0";
+    final price = double.tryParse(priceString) ?? 0.0;
+    setState(() {
+      totalPrice = numberOfPeople * price;
+    });
+  }
+
+  Future<void> loadTokenAndUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = await storage.read(key: 'jwt_token');
+    final uid = prefs.getInt('user_id');
+
+    setState(() {
+      jwtToken = token;
+      userId = uid;
+    });
+
+    print("🔐 Token JWT : $jwtToken");
+    print("👤 USER ID : $userId");
+  }
 
   Future<void> reserver() async {
-    if (selectedDate == null) {
-      setState(() => errorMessage = "Veuillez choisir une date.");
-      return;
-    }
-
-    final token = await storage.read(key: 'jwt_token');
-    if (token == null) {
-      setState(() => errorMessage = "Token JWT manquant.");
+    if (jwtToken == null || userId == null) {
+      setState(() => errorMessage = "Token JWT ou ID utilisateur manquant.");
       return;
     }
 
@@ -41,23 +68,25 @@ class _ReservationScreenState extends State<ReservationScreen> {
       final response = await http.post(
         Uri.parse('https://insidecasa.me/api/reservations'),
         headers: {
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $jwtToken',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
           "activity_id": widget.activity['id'],
-          "date": selectedDate!
-              .toIso8601String()
-              .split('T')[0], // Format YYYY-MM-DD
+          "user_id": userId,
+          "nombre_personnes": numberOfPeople,
         }),
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Réservation effectuée avec succès !')),
+          SnackBar(
+              content: Text(
+                  'Réservation confirmée pour $numberOfPeople personne(s)')),
         );
       } else {
+        print("⛔ Erreur API : ${response.body}");
         setState(() => errorMessage = "Erreur : ${response.statusCode}");
       }
     } catch (e) {
@@ -69,6 +98,9 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final priceString = widget.activity['price']?.toString() ?? "0";
+    final unitPrice = double.tryParse(priceString) ?? 0.0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Réserver ${widget.activity['title']}"),
@@ -80,28 +112,63 @@ class _ReservationScreenState extends State<ReservationScreen> {
         child: Column(
           children: [
             Text(
-              "Choisir une date :",
+              "Nombre de personnes :",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: numberOfPeople > 1
+                      ? () {
+                          setState(() {
+                            numberOfPeople--;
+                            updateTotalPrice();
+                          });
+                        }
+                      : null,
+                  icon: Icon(Icons.remove),
+                ),
+                Text(
+                  numberOfPeople.toString(),
+                  style: TextStyle(fontSize: 18),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      numberOfPeople++;
+                      updateTotalPrice();
+                    });
+                  },
+                  icon: Icon(Icons.add),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "Prix de l'activité :",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "${unitPrice.toStringAsFixed(2)} MAD / personne",
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(Duration(days: 365)),
-                );
-                if (picked != null) {
-                  setState(() => selectedDate = picked);
-                }
-              },
-              icon: Icon(Icons.calendar_today),
-              label: Text(
-                selectedDate == null
-                    ? "Sélectionner une date"
-                    : "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
-              ),
+            Text(
+              "💰 Prix total à payer :",
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700]),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "${totalPrice.toStringAsFixed(2)} MAD",
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[900]),
             ),
             const SizedBox(height: 24),
             if (errorMessage.isNotEmpty)
