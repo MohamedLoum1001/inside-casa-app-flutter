@@ -6,13 +6,7 @@ import 'package:inside_casa_app/user-interface/screens/ProfileScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ReservationsHistoryScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ReviewScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ShareScreen.dart';
-// import 'FavoritesScreen.dart';
-// import 'DiscoveryScreen.dart';
-// import 'ReservationsHistoryScreen.dart';
-// import 'ProfileScreen.dart';
-// import 'ReviewScreen.dart';
-// import 'ShareScreen.dart';
-// import 'CreateAccountScreen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,13 +17,24 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int? userId;
+  String? jwtToken;
+  bool isLoading = true;
 
-  final List<Widget> _mainPages = [
-    const DiscoveryScreen(),
-    const FavoritesScreen(),
-    const ReservationsHistoryScreen(),
-    const ProfileScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getInt('user_id');
+      jwtToken = prefs.getString('jwt_token');
+      isLoading = false;
+    });
+  }
 
   void _navigateToDrawerPage(Widget page) {
     Navigator.pop(context); // Fermer le drawer
@@ -38,6 +43,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final List<Widget> _mainPages = [
+      const DiscoveryScreen(),
+      const FavoritesScreen(),
+      if (userId != null && jwtToken != null)
+        ReservationsHistoryScreen(userId: userId!, jwtToken: jwtToken!)
+      else
+        const Center(child: Text("Erreur d'identification")),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Inside Casa"),
@@ -51,7 +72,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const DrawerHeader(
               decoration: BoxDecoration(color: Color(0xFFfdcf00)),
-              child: Text('Menu', style: TextStyle(fontSize: 24, color: Colors.white)),
+              child: Text('Menu',
+                  style: TextStyle(fontSize: 24, color: Colors.white)),
             ),
             ListTile(
               leading: const Icon(Icons.star),

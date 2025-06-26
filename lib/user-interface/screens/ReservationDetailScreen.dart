@@ -1,242 +1,140 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ReservationDetailScreen extends StatefulWidget {
   final int reservationId;
+  final String jwtToken;
 
-  const ReservationDetailScreen({super.key, required this.reservationId});
+  const ReservationDetailScreen({
+    super.key,
+    required this.reservationId,
+    required this.jwtToken,
+  });
 
   @override
-  State<ReservationDetailScreen> createState() =>
-      _ReservationDetailScreenState();
+  State<ReservationDetailScreen> createState() => _ReservationDetailScreenState();
 }
 
 class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
-  bool isLoading = true;
-  bool isProcessing = false;
-  String? error;
   Map<String, dynamic>? reservation;
+  bool isLoading = true;
+  String? error;
 
   @override
   void initState() {
     super.initState();
-    fetchReservation();
+    fetchReservationDetail();
   }
 
-  Future<void> fetchReservation() async {
-    setState(() {
-      isLoading = true;
-      error = null;
-    });
-
+  Future<void> fetchReservationDetail() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token') ?? prefs.getString('token');
-      if (token == null) throw Exception("Token non trouvé");
-
       final response = await http.get(
-        Uri.parse(
-            'https://insidecasa.me/api/reservations/${widget.reservationId}'),
+        Uri.parse('https://insidecasa.me/api/reservations/${widget.reservationId}'),
         headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
+          'Authorization': 'Bearer ${widget.jwtToken}',
+          'Content-Type': 'application/json',
         },
       );
 
       if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         setState(() {
-          reservation = jsonDecode(response.body);
+          reservation = data;
           isLoading = false;
         });
       } else {
-        throw Exception("Erreur ${response.statusCode} lors du chargement");
+        setState(() {
+          error = "Erreur ${response.statusCode}";
+          isLoading = false;
+        });
       }
     } catch (e) {
       setState(() {
-        error = e.toString();
+        error = "Erreur : $e";
         isLoading = false;
       });
     }
   }
 
-  Future<void> deleteReservation() async {
+  String formatDate(String? date) {
+    if (date == null) return "Date inconnue";
     try {
-      setState(() => isProcessing = true);
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token') ?? prefs.getString('token');
-      if (token == null) throw Exception("Token non trouvé");
-
-      final response = await http.delete(
-        Uri.parse(
-            'https://insidecasa.me/api/reservations/${widget.reservationId}'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réservation supprimée avec succès')),
-        );
-        Navigator.pop(context, true);
-      } else {
-        throw Exception("Erreur suppression : ${response.statusCode}");
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur suppression : $e")),
-      );
-    } finally {
-      if (mounted) setState(() => isProcessing = false);
-    }
-  }
-
-  Future<void> payReservation() async {
-    try {
-      setState(() => isProcessing = true);
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token') ?? prefs.getString('token');
-      if (token == null) throw Exception("Token non trouvé");
-
-      final response = await http.post(
-        Uri.parse(
-            'https://insidecasa.me/api/reservations/${widget.reservationId}/pay'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement effectué avec succès')),
-        );
-        await fetchReservation();
-      } else {
-        throw Exception("Erreur paiement : ${response.statusCode}");
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur paiement : $e")),
-      );
-    } finally {
-      if (mounted) setState(() => isProcessing = false);
+      return DateTime.parse(date).toLocal().toString().split(' ')[0];
+    } catch (_) {
+      return date;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final activity = reservation?['activity'] ?? {};
-    final int nbPersonnes = reservation?['nombre_personnes'] ?? 1;
-    final String date = reservation?['date'] ?? 'Non précisée';
-
-    final String location = activity['location'] ?? 'Lieu non spécifié';
-    final int duration = activity['duration'] is int
-        ? activity['duration']
-        : int.tryParse(activity['duration']?.toString() ?? '0') ?? 0;
-    final double unitPrice = activity['price'] is String
-        ? double.tryParse(activity['price']) ?? 0
-        : activity['price'] is num
-            ? activity['price'].toDouble()
-            : 0.0;
-    final double totalPrice = nbPersonnes * unitPrice;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Détail de la réservation')),
+      appBar: AppBar(
+        title: Text('Détail Réservation #${widget.reservationId}'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+      ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Text('Erreur : $error'))
-              : Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ListView(
-                    children: [
-                      if (activity['image_urls'] != null &&
-                          activity['image_urls'] is List &&
-                          activity['image_urls'].isNotEmpty)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            activity['image_urls'][0],
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.image, size: 80),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      Text(activity['title'] ?? 'Sans titre',
-                          style: const TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text(activity['description'] ?? 'Pas de description'),
-                      const SizedBox(height: 12),
-                      Row(
+              ? Center(child: Text(error!))
+              : reservation == null
+                  ? Center(child: Text("Aucune donnée"))
+                  : Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ListView(
                         children: [
-                          const Icon(Icons.place, size: 20, color: Colors.grey),
-                          const SizedBox(width: 6),
-                          Text(location),
+                          Text(
+                            "ID Réservation : ${reservation!['id']}",
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                          ),
+                          SizedBox(height: 12),
+                          // Affichage des détails de l'activité si elle existe
+                          ..._buildActivityDetails(reservation!['activity']),
+                          SizedBox(height: 16),
+                          Text("Nombre de personnes : ${reservation!['nombre_personnes'] ?? 'N/A'}"),
+                          Text("Date : ${formatDate(reservation!['date'])}"),
+                          Text("Statut : ${reservation!['status'] ?? 'N/A'}"),
+                          SizedBox(height: 16),
+                          Text(
+                            "Prix unitaire : ${reservation!['activity'] != null ? (reservation!['activity']['price'] ?? '0') : '0'} MAD"
+                          ),
+                          Text(
+                            "Prix total : ${(reservation!['nombre_personnes'] ?? 1) * (double.tryParse(reservation!['activity']?['price']?.toString() ?? '0') ?? 0)} MAD",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.timer, size: 20, color: Colors.grey),
-                          const SizedBox(width: 6),
-                          Text('$duration minutes'),
-                        ],
-                      ),
-                      const Divider(height: 32),
-                      Text('📅 Date de réservation : $date'),
-                      const SizedBox(height: 8),
-                      Text('👥 Nombre de personnes : $nbPersonnes'),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.attach_money, color: Colors.green),
-                          const SizedBox(width: 6),
-                          Text('${unitPrice.toStringAsFixed(2)} MAD'),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '💰 Prix total : ${totalPrice.toStringAsFixed(2)} MAD',
-                        style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green),
-                      ),
-                      const SizedBox(height: 24),
-                      if (isProcessing)
-                        const Center(child: CircularProgressIndicator())
-                      else ...[
-                        ElevatedButton.icon(
-                          onPressed: deleteReservation,
-                          icon: const Icon(Icons.delete),
-                          label: const Text('Supprimer'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          onPressed: payReservation,
-                          icon: const Icon(Icons.payment),
-                          label: const Text('Payer maintenant'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                    ),
     );
+  }
+
+  List<Widget> _buildActivityDetails(dynamic activity) {
+    if (activity == null) {
+      return [
+        Text(
+          "Activité supprimée ou non trouvée.",
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+        ),
+      ];
+    }
+    final location = activity['location'] ?? 'Non spécifié';
+    final duration = activity['duration']?.toString() ?? 'Inconnue';
+    final title = activity['title'] ?? 'Sans titre';
+    final imageUrls = activity['image_urls'] as List<dynamic>? ?? [];
+    final imageUrl = imageUrls.isNotEmpty ? imageUrls[0] : null;
+
+    return [
+      if (imageUrl != null)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(imageUrl, height: 200, fit: BoxFit.cover),
+        ),
+      SizedBox(height: 12),
+      Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      SizedBox(height: 8),
+      Text("Lieu : $location"),
+      Text("Durée : $duration minutes"),
+    ];
   }
 }

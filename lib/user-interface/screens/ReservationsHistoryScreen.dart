@@ -1,13 +1,16 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
-
-// import 'package:inside_casa_app/user-interface/screens/ReservationDetailScreen.dart';
 
 class ReservationsHistoryScreen extends StatefulWidget {
-  const ReservationsHistoryScreen({super.key});
+  final int userId;
+  final String jwtToken;
+
+  const ReservationsHistoryScreen({
+    super.key,
+    required this.userId,
+    required this.jwtToken,
+  });
 
   @override
   State<ReservationsHistoryScreen> createState() =>
@@ -15,224 +18,362 @@ class ReservationsHistoryScreen extends StatefulWidget {
 }
 
 class _ReservationsHistoryScreenState extends State<ReservationsHistoryScreen> {
+  List<Map<String, dynamic>> reservationsWithActivity = [];
+  Map<int, dynamic> activitiesById = {};
   bool isLoading = true;
-  List reservations = [];
   String? error;
-  bool isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    loadUserReservations();
+    fetchAll();
   }
 
-  Future<void> loadUserReservations() async {
+  Future<void> fetchAll() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
-      final userId = prefs.getInt('user_id');
-
-      if (token == null || userId == null) {
-        throw Exception("Utilisateur non connecté.");
+      // 1. Charger toutes les activités
+      final activitiesResp = await http.get(
+        Uri.parse('https://insidecasa.me/api/activities'),
+      );
+      if (activitiesResp.statusCode != 200) {
+        setState(() {
+          error = "Erreur chargement activités";
+          isLoading = false;
+        });
+        return;
       }
+      final activitiesList = jsonDecode(activitiesResp.body) as List;
+      activitiesById = {
+        for (var a in activitiesList) a['id'] as int: a,
+      };
 
-      final url = 'https://insidecasa.me/api/reservations/user/$userId';
-
-      final response = await http.get(
-        Uri.parse(url),
+      // 2. Charger les réservations utilisateur
+      final reservationsResp = await http.get(
+        Uri.parse(
+            'https://insidecasa.me/api/reservations/user/${widget.userId}'),
         headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
+          'Authorization': 'Bearer ${widget.jwtToken}',
+          'Content-Type': 'application/json',
         },
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (reservationsResp.statusCode != 200) {
         setState(() {
-          reservations = List.from(data);
+          error = "Erreur chargement réservations";
           isLoading = false;
         });
-      } else {
-        setState(() {
-          error = "Erreur ${response.statusCode}";
-          isLoading = false;
+        return;
+      }
+      final reservationsList = jsonDecode(reservationsResp.body) as List;
+
+      List<Map<String, dynamic>> tempList = [];
+      for (var r in reservationsList) {
+        // Correction robuste pour le nombre de personnes
+        int nbPersonnes = 1;
+        if (r['nombre_personnes'] != null) {
+          nbPersonnes = r['nombre_personnes'] is int
+              ? r['nombre_personnes']
+              : int.tryParse(r['nombre_personnes'].toString()) ?? 1;
+        } else if (r['nb_personnes'] != null) {
+          nbPersonnes = r['nb_personnes'] is int
+              ? r['nb_personnes']
+              : int.tryParse(r['nb_personnes'].toString()) ?? 1;
+        } else if (r['number_of_people'] != null) {
+          nbPersonnes = r['number_of_people'] is int
+              ? r['number_of_people']
+              : int.tryParse(r['number_of_people'].toString()) ?? 1;
+        } else if (r['activity'] != null &&
+            r['activity']['nombre_personnes'] != null) {
+          nbPersonnes = r['activity']['nombre_personnes'] is int
+              ? r['activity']['nombre_personnes']
+              : int.tryParse(r['activity']['nombre_personnes'].toString()) ?? 1;
+        }
+
+        final int? activityId = r['activity_id'] ?? r['activity']?['id'];
+        final activity = activityId != null ? activitiesById[activityId] : null;
+
+        final String title = activity?['title']?.toString() ?? 'Sans titre';
+        final String location =
+            activity?['location']?.toString() ?? 'Non spécifié';
+        final int duration = activity?['duration'] is int
+            ? activity['duration']
+            : int.tryParse(activity?['duration']?.toString() ?? '') ?? 0;
+        final double unitPrice = activity?['price'] is String
+            ? double.tryParse(activity?['price']) ?? 0.0
+            : (activity?['price'] is num)
+                ? activity['price'].toDouble()
+                : 0.0;
+        final double totalPrice = nbPersonnes * unitPrice;
+        final String date = activity?['createdAt']?.toString() ?? '';
+        final imageUrls = activity?['image_urls'] as List<dynamic>? ?? [];
+        final String? imageUrl = imageUrls.isNotEmpty ? imageUrls[0] : null;
+
+        print("Titre : $title");
+        print("📍 Lieu : $location");
+        print("⏱ Durée : $duration minutes");
+        print("📅 Date : $date");
+        print("👥 Nombre de personnes : $nbPersonnes");
+        print("💰 Prix unitaire : ${unitPrice.toStringAsFixed(2)} MAD");
+        print("💰 Prix total : ${totalPrice.toStringAsFixed(2)} MAD");
+
+        tempList.add({
+          'reservationId': r['id'],
+          'title': title,
+          'location': location,
+          'duration': duration,
+          'date': date,
+          'nbPersonnes': nbPersonnes,
+          'unitPrice': unitPrice,
+          'totalPrice': totalPrice,
+          'imageUrl': imageUrl,
         });
       }
+
+      setState(() {
+        reservationsWithActivity = tempList;
+        isLoading = false;
+      });
     } catch (e) {
       setState(() {
-        error = "Erreur: $e";
+        error = "Erreur : $e";
         isLoading = false;
       });
     }
   }
 
-  Future<void> cancelReservation(int reservationId) async {
-    setState(() => isProcessing = true);
+  String formatDate(String? date) {
+    if (date == null || date.isEmpty) return "";
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
-      if (token == null) throw Exception("Utilisateur non connecté.");
+      return DateTime.parse(date).toLocal().toString().split(' ')[0];
+    } catch (_) {
+      return date;
+    }
+  }
 
+  Future<void> deleteReservation(int reservationId) async {
+    try {
       final response = await http.delete(
         Uri.parse('https://insidecasa.me/api/reservations/$reservationId'),
         headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
+          'Authorization': 'Bearer ${widget.jwtToken}',
+          'Content-Type': 'application/json',
         },
       );
-
       if (response.statusCode == 200 || response.statusCode == 204) {
+        setState(() {
+          reservationsWithActivity
+              .removeWhere((r) => r['reservationId'] == reservationId);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réservation annulée avec succès')),
+          SnackBar(content: Text('Réservation supprimée')),
         );
-        await loadUserReservations();
       } else {
-        throw Exception('Erreur annulation : ${response.statusCode}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la suppression')),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur annulation : $e')),
+        SnackBar(content: Text('Erreur : $e')),
       );
-    } finally {
-      setState(() => isProcessing = false);
     }
   }
 
-  Future<void> payReservation(int reservationId) async {
-    setState(() => isProcessing = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
-      if (token == null) throw Exception("Utilisateur non connecté.");
-
-      final response = await http.post(
-        Uri.parse('https://insidecasa.me/api/reservations/$reservationId/pay'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement effectué avec succès')),
-        );
-        await loadUserReservations();
-      } else {
-        throw Exception('Erreur paiement : ${response.statusCode}');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur paiement : $e')),
-      );
-    } finally {
-      setState(() => isProcessing = false);
-    }
-  }
-
-  String formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return DateFormat('dd/MM/yyyy').format(date);
-    } catch (_) {
-      return dateString;
-    }
+  void payerReservation(Map<String, dynamic> reservation) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(
+              'Paiement pour la réservation #${reservation['reservationId']}')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    int totalPersonnes = 0;
+    double totalAPayer = 0.0;
+    for (var r in reservationsWithActivity) {
+      totalPersonnes += r['nbPersonnes'] as int;
+      totalAPayer += r['totalPrice'] as double;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Mes Réservations"),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 1,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : error != null
               ? Center(child: Text(error!))
-              : reservations.isEmpty
+              : reservationsWithActivity.isEmpty
                   ? const Center(child: Text("Aucune réservation trouvée."))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: reservations.length,
-                      itemBuilder: (_, i) {
-                        final r = reservations[i];
-                        final activity = r['activity'] ?? {};
-                        final nbPersonnes = r['nombre_personnes'] ?? 1;
-                        final date = r['date'] ?? '';
-
-                        final double unitPrice = activity['price'] is String
-                            ? double.tryParse(activity['price']) ?? 0
-                            : activity['price'] is num
-                                ? activity['price'].toDouble()
-                                : 0.0;
-                        final double totalPrice = nbPersonnes * unitPrice;
-
-                        return Card(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 2,
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Réservation #${r['id']}",
-                                  style: const TextStyle(
+                  : Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          color: Colors.grey[100],
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "👥 Total personnes : $totalPersonnes",
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "💰 Total à payer : ${totalAPayer.toStringAsFixed(2)} MAD",
+                                style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text("Date : ${formatDate(date)}"),
-                                Text("Nombre de personnes : $nbPersonnes"),
-                                Text(
-                                  "Prix unitaire : ${unitPrice.toStringAsFixed(2)} MAD",
-                                ),
-                                Text(
-                                  "Prix total : ${totalPrice.toStringAsFixed(2)} MAD",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Boutons Payer et Annuler
-                                if (isProcessing)
-                                  const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                else
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: () =>
-                                            cancelReservation(r['id']),
-                                        style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red),
-                                        child: const Text("Annuler"),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () =>
-                                            payReservation(r['id']),
-                                        style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green),
-                                        child: const Text("Payer"),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
+                                    fontSize: 16,
+                                    color: Colors.green),
+                              ),
+                            ],
                           ),
-                        );
-                      },
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: reservationsWithActivity.length,
+                            itemBuilder: (_, index) {
+                              final r = reservationsWithActivity[index];
+                              final String title = r['title'];
+                              final String location = r['location'];
+                              final int duration = r['duration'];
+                              final String date = r['date'];
+                              final int nbPersonnes = r['nbPersonnes'];
+                              final double unitPrice = r['unitPrice'];
+                              final double totalPrice = r['totalPrice'];
+                              final String? imageUrl = r['imageUrl'];
+
+                              return Card(
+                                margin:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (imageUrl != null && imageUrl.isNotEmpty)
+                                      ClipRRect(
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                                top: Radius.circular(12)),
+                                        child: Image.network(
+                                          imageUrl,
+                                          height: 180,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Container(
+                                            height: 180,
+                                            color: Colors.grey[200],
+                                            child: const Icon(
+                                                Icons.image_not_supported,
+                                                size: 60,
+                                                color: Colors.grey),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        height: 180,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[200],
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                  top: Radius.circular(12)),
+                                        ),
+                                        child: const Icon(
+                                            Icons.image_not_supported,
+                                            size: 60,
+                                            color: Colors.grey),
+                                      ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            title,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text("📍 Lieu : $location"),
+                                          Text("⏱ Durée : $duration minutes"),
+                                          Text("📅 Date : $date"),
+                                          Text(
+                                              "👥 Nombre de personnes : $nbPersonnes"),
+                                          Text(
+                                              "💰 Prix unitaire : ${unitPrice.toStringAsFixed(2)} MAD"),
+                                          Text(
+                                            "💰 Prix total : ${totalPrice.toStringAsFixed(2)} MAD",
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.end,
+                                            children: [
+                                              ElevatedButton.icon(
+                                                onPressed: () =>
+                                                    deleteReservation(
+                                                        r['reservationId']),
+                                                icon: const Icon(Icons.delete,
+                                                    color: Colors.white),
+                                                label: const Text("Supprimer"),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              ElevatedButton.icon(
+                                                onPressed: () =>
+                                                    payerReservation(r),
+                                                icon: const Icon(Icons.payment,
+                                                    color: Colors.white),
+                                                label: const Text("Payer"),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.green,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
     );
   }

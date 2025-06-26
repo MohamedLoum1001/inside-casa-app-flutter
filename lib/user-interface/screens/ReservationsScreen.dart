@@ -1,5 +1,3 @@
-// ignore_for_file: prefer_const_constructors, depend_on_referenced_packages, file_names
-
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -31,9 +29,17 @@ class _ReservationScreenState extends State<ReservationScreen> {
     updateTotalPrice();
   }
 
+  double getActivityPrice() {
+    final priceRaw = widget.activity['price'];
+    if (priceRaw == null) return 0.0;
+    if (priceRaw is int) return priceRaw.toDouble();
+    if (priceRaw is double) return priceRaw;
+    if (priceRaw is String) return double.tryParse(priceRaw) ?? 0.0;
+    return 0.0;
+  }
+
   void updateTotalPrice() {
-    final priceString = widget.activity['price']?.toString() ?? "0";
-    final price = double.tryParse(priceString) ?? 0.0;
+    final price = getActivityPrice();
     setState(() {
       totalPrice = numberOfPeople * price;
     });
@@ -48,9 +54,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
       jwtToken = token;
       userId = uid;
     });
-
-    print("🔐 Token JWT : $jwtToken");
-    print("👤 USER ID : $userId");
   }
 
   Future<void> reserver() async {
@@ -79,14 +82,28 @@ class _ReservationScreenState extends State<ReservationScreen> {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Réservation confirmée pour $numberOfPeople personne(s)')),
-        );
+        final responseData = jsonDecode(response.body);
+
+        print("✅ Réservation effectuée !");
+        print("🆔 ID Réservation : ${responseData['id']}");
+        print("Titre : ${widget.activity['title']}");
+        print("📍 Lieu : ${widget.activity['location']}");
+        print("⏱ Durée : ${widget.activity['duration']} minutes");
+        print("📅 Date : ${widget.activity['createdAt'] ?? ''}");
+        print("👥 Nombre de personnes : $numberOfPeople");
+        print(
+            "💰 Prix unitaire : ${getActivityPrice().toStringAsFixed(2)} MAD");
+        print("💰 Prix total : ${totalPrice.toStringAsFixed(2)} MAD");
+
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Réservation confirmée pour $numberOfPeople personne(s)')),
+          );
+        }
       } else {
-        print("⛔ Erreur API : ${response.body}");
         setState(() => errorMessage = "Erreur : ${response.statusCode}");
       }
     } catch (e) {
@@ -98,8 +115,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final priceString = widget.activity['price']?.toString() ?? "0";
-    final unitPrice = double.tryParse(priceString) ?? 0.0;
+    final unitPrice = getActivityPrice();
 
     return Scaffold(
       appBar: AppBar(
@@ -110,6 +126,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               "Nombre de personnes :",
