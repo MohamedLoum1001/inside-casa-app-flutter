@@ -72,6 +72,11 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                         ? act['image_urls'][0]
                         : 'https://via.placeholder.com/400x200';
 
+                    final durationStr =
+                        act['duration']?.toString() ?? 'Inconnue';
+                    final priceStr = act['price']?.toString() ?? '0';
+                    final price = double.tryParse(priceStr) ?? 0.0;
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
@@ -125,7 +130,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                                       const Icon(Icons.timer,
                                           color: Colors.grey),
                                       const SizedBox(width: 6),
-                                      Text("${act['duration']} min"),
+                                      Text("$durationStr min"),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
@@ -134,7 +139,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                                       const Icon(Icons.attach_money,
                                           color: Colors.green),
                                       const SizedBox(width: 6),
-                                      Text("${act['price']} MAD"),
+                                      Text("${price.toStringAsFixed(2)} MAD"),
                                     ],
                                   ),
                                 ],
