@@ -6,8 +6,6 @@ import 'dart:convert';
 
 import 'package:inside_casa_app/user-interface/screens/CategoriesDetailScreen.dart';
 
-// import 'CategoriesDetailScreen.dart';
-
 class CategoriesScreen extends StatefulWidget {
   final String filter;
 
@@ -29,7 +27,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Future<void> fetchCategories() async {
     try {
-      final response = await http.get(Uri.parse("https://insidecasa.me/api/categories"));
+      final response =
+          await http.get(Uri.parse("https://insidecasa.me/api/categories"));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -44,6 +43,25 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       setState(() => isLoading = false);
       debugPrint("Erreur : $e");
     }
+  }
+
+  // Associe une icône à chaque nom de catégorie
+  IconData getIconForCategory(String name) {
+    final lowerName = name.toLowerCase();
+
+    if (lowerName.contains('musique')) return Icons.music_note;
+    if (lowerName.contains('sport')) return Icons.sports_soccer;
+    if (lowerName.contains('art')) return Icons.brush;
+    if (lowerName.contains('danse')) return Icons.directions_run;
+    if (lowerName.contains('cuisine')) return Icons.restaurant;
+    if (lowerName.contains('voyage')) return Icons.flight_takeoff;
+    if (lowerName.contains('technologie')) return Icons.computer;
+    if (lowerName.contains('photo') || lowerName.contains('photographie')) {
+      return Icons.camera_alt;
+    }
+    if (lowerName.contains('lecture')) return Icons.menu_book;
+
+    return Icons.category; // Icône par défaut
   }
 
   @override
@@ -69,7 +87,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   padding: const EdgeInsets.all(16),
                   child: GridView.builder(
                     itemCount: filteredCategories.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
@@ -77,7 +96,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     ),
                     itemBuilder: (_, index) {
                       final category = filteredCategories[index];
-                      final imageUrl = category['image'] ?? '';
+                      final categoryName = category['name'] ?? '';
 
                       return GestureDetector(
                         onTap: () {
@@ -86,8 +105,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             MaterialPageRoute(
                               builder: (_) => CategoriesDetailScreen(
                                 categoryId: category['id'],
-                                categoryName: category['name'],
-                                categoryTitle: category['name'],
+                                categoryName: categoryName,
+                                categoryTitle: categoryName,
                               ),
                             ),
                           );
@@ -107,23 +126,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (imageUrl.isNotEmpty)
-                                SizedBox(
-                                  width: 80,
-                                  height: 80,
-                                  child: Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Icon(Icons.broken_image, size: 40);
-                                    },
-                                  ),
-                                )
-                              else
-                                const Icon(Icons.image_not_supported, size: 40),
-                              const SizedBox(height: 8),
+                              Icon(
+                                getIconForCategory(categoryName),
+                                size: 60,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(height: 10),
                               Text(
-                                category['name'],
+                                categoryName,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
