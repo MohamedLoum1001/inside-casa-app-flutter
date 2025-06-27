@@ -1,7 +1,11 @@
+// ignore_for_file: no_leading_underscores_for_local_identifiers, use_build_context_synchronously
+
 import 'package:flutter/material.dart';
+import 'package:inside_casa_app/user-interface/auth/login/LoginScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/CreateAccountScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/DiscoveryScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/FavoritesScreen.dart';
+// import 'package:inside_casa_app/user-interface/screens/LoginScreen.dart'; // <-- Import LoginScreen
 import 'package:inside_casa_app/user-interface/screens/ProfileScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ReservationsHistoryScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ReviewScreen.dart';
@@ -39,6 +43,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void _navigateToDrawerPage(Widget page) {
     Navigator.pop(context); // Fermer le drawer
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('jwt_token');
+    await prefs.remove('user_id');
+    Navigator.pop(context); // Fermer le drawer
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override
@@ -87,8 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.person_add),
-              title: const Text("Créer un compte"),
+              title: const Text("Modifier mon compte"),
               onTap: () => _navigateToDrawerPage(const CreateAccountScreen()),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text("Déconnexion",
+                  style: TextStyle(color: Colors.red)),
+              onTap: _logout,
             ),
           ],
         ),
