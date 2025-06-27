@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:inside_casa_app/user-interface/screens/PaymentValidationScreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+
 
 class ReservationScreen extends StatefulWidget {
   final Map activity;
@@ -21,6 +23,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
   int? userId;
   int numberOfPeople = 1;
   double totalPrice = 0;
+  int? lastReservationId;
+  bool paymentReady = false;
 
   @override
   void initState() {
@@ -65,6 +69,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
     setState(() {
       isSubmitting = true;
       errorMessage = '';
+      paymentReady = false;
+      lastReservationId = null;
     });
 
     try {
@@ -83,26 +89,18 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
+        final reservationId = responseData['id'];
+        setState(() {
+          lastReservationId = reservationId;
+        });
 
-        print("✅ Réservation effectuée !");
-        print("🆔 ID Réservation : ${responseData['id']}");
-        print("Titre : ${widget.activity['title']}");
-        print("📍 Lieu : ${widget.activity['location']}");
-        print("⏱ Durée : ${widget.activity['duration']} minutes");
-        print("📅 Date : ${widget.activity['createdAt'] ?? ''}");
-        print("👥 Nombre de personnes : $numberOfPeople");
-        print(
-            "💰 Prix unitaire : ${getActivityPrice().toStringAsFixed(2)} MAD");
-        print("💰 Prix total : ${totalPrice.toStringAsFixed(2)} MAD");
+        await createPaymentIntent(reservationId);
 
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Réservation confirmée pour $numberOfPeople personne(s)')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Réservation confirmée pour $numberOfPeople personne(s). Procédez au paiement.')),
+        );
       } else {
         setState(() => errorMessage = "Erreur : ${response.statusCode}");
       }
@@ -110,6 +108,116 @@ class _ReservationScreenState extends State<ReservationScreen> {
       setState(() => errorMessage = "Erreur : ${e.toString()}");
     } finally {
       setState(() => isSubmitting = false);
+    }
+  }
+
+  Future<void> createPaymentIntent(int reservationId) async {
+    if (jwtToken == null || userId == null) return;
+    final price = getActivityPrice();
+
+    int eventId = 0;
+    if (widget.activity.containsKey('event_id')) {
+      final eventIdRaw = widget.activity['event_id'];
+      if (eventIdRaw is int) {
+        eventId = eventIdRaw;
+      } else if (eventIdRaw is String) {
+        eventId = int.tryParse(eventIdRaw) ?? 0;
+      }
+    }
+
+    if (eventId == 0) {
+      try {
+        final eventsResp =
+            await http.get(Uri.parse('https://insidecasa.me/api/events'));
+        if (eventsResp.statusCode == 200) {
+          final events = jsonDecode(eventsResp.body) as List;
+          final activityId = widget.activity['id'] is int
+              ? widget.activity['id']
+              : int.tryParse(widget.activity['id'].toString()) ?? 0;
+          final event = events.firstWhere(
+            (e) => e['activity_id'] == activityId,
+            orElse: () => null,
+          );
+          if (event != null) {
+            eventId = event['id'];
+          }
+        }
+      } catch (e) {
+        setState(() {
+          errorMessage = "Erreur lors de la récupération de l'événement : $e";
+        });
+        return;
+      }
+    }
+
+    if (eventId == 0) {
+      setState(() {
+        errorMessage =
+            "Aucun event_id valide trouvé pour cette activité. Vérifiez que l'activité est bien liée à un événement.";
+        paymentReady = false;
+      });
+      return;
+    }
+
+    final response = await http.post(
+      Uri.parse('https://insidecasa.me/api/reservations/create-payment-intent'),
+      headers: {
+        'Authorization': 'Bearer $jwtToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "reservation_id": reservationId,
+        "user_id": userId,
+        "event_id": eventId,
+        "participants": numberOfPeople,
+        "price": price,
+      }),
+    );
+    if (response.statusCode == 200) {
+      setState(() {
+        paymentReady = true;
+      });
+    } else {
+      setState(() {
+        errorMessage = "Erreur création paiement : ${response.body}";
+        paymentReady = false;
+      });
+    }
+  }
+
+  Future<void> confirmPayment(int reservationId) async {
+    if (jwtToken == null) return;
+
+    setState(() {
+      errorMessage = '';
+    });
+
+    final response = await http.post(
+      Uri.parse(
+          'https://insidecasa.me/api/reservations/$reservationId/confirm-payment'),
+      headers: {
+        'Authorization': 'Bearer $jwtToken',
+        'Content-Type': 'application/json',
+      },
+    );
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Paiement confirmé !')),
+      );
+      Navigator.pop(context);
+    } else if (response.body.contains("Aucun PaymentIntent associé")) {
+      await createPaymentIntent(reservationId);
+      if (paymentReady) {
+        await confirmPayment(reservationId);
+      } else {
+        setState(() {
+          errorMessage = "Impossible de créer le paiement. Réessayez.";
+        });
+      }
+    } else {
+      setState(() {
+        errorMessage = "Erreur paiement : ${response.body}";
+      });
     }
   }
 
@@ -211,6 +319,43 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       ),
               ),
             ),
+            if (paymentReady && lastReservationId != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 24.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.payment),
+                    label: Text(
+                      "Payer maintenant",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: paymentReady
+                        ? () async {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PaymentValidationScreen(
+                                  onPaymentConfirmed: () async {
+                                    Navigator.pop(context);
+                                    await confirmPayment(lastReservationId!);
+                                  },
+                                ),
+                              ),
+                            );
+                          }
+                        : null,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

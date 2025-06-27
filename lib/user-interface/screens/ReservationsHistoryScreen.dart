@@ -71,7 +71,6 @@ class _ReservationsHistoryScreenState extends State<ReservationsHistoryScreen> {
 
       List<Map<String, dynamic>> tempList = [];
       for (var r in reservationsList) {
-        // Correction robuste pour le nombre de personnes
         int nbPersonnes = 1;
         if (r['nombre_personnes'] != null) {
           nbPersonnes = r['nombre_personnes'] is int
@@ -111,14 +110,6 @@ class _ReservationsHistoryScreenState extends State<ReservationsHistoryScreen> {
         final imageUrls = activity?['image_urls'] as List<dynamic>? ?? [];
         final String? imageUrl = imageUrls.isNotEmpty ? imageUrls[0] : null;
 
-        print("Titre : $title");
-        print("📍 Lieu : $location");
-        print("⏱ Durée : $duration minutes");
-        print("📅 Date : $date");
-        print("👥 Nombre de personnes : $nbPersonnes");
-        print("💰 Prix unitaire : ${unitPrice.toStringAsFixed(2)} MAD");
-        print("💰 Prix total : ${totalPrice.toStringAsFixed(2)} MAD");
-
         tempList.add({
           'reservationId': r['id'],
           'title': title,
@@ -141,15 +132,6 @@ class _ReservationsHistoryScreenState extends State<ReservationsHistoryScreen> {
         error = "Erreur : $e";
         isLoading = false;
       });
-    }
-  }
-
-  String formatDate(String? date) {
-    if (date == null || date.isEmpty) return "";
-    try {
-      return DateTime.parse(date).toLocal().toString().split(' ')[0];
-    } catch (_) {
-      return date;
     }
   }
 
@@ -182,12 +164,31 @@ class _ReservationsHistoryScreenState extends State<ReservationsHistoryScreen> {
     }
   }
 
-  void payerReservation(Map<String, dynamic> reservation) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(
-              'Paiement pour la réservation #${reservation['reservationId']}')),
-    );
+  Future<void> payerReservation(Map<String, dynamic> reservation) async {
+    final reservationId = reservation['reservationId'];
+    try {
+      final response = await http.post(
+        Uri.parse('https://insidecasa.me/api/reservations/$reservationId/confirm-payment'),
+        headers: {
+          'Authorization': 'Bearer ${widget.jwtToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Paiement confirmé pour la réservation #$reservationId')),
+        );
+        fetchAll();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur paiement : ${response.body}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur paiement : $e')),
+      );
+    }
   }
 
   @override
