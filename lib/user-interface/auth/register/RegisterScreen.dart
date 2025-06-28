@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,6 +26,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool isLoading = false;
   String selectedRole = 'Utilisateur';
 
+  final storage = const FlutterSecureStorage();
+
   final RegExp emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
   final RegExp phoneRegex = RegExp(r'^0[5-7][0-9]{8}$');
 
@@ -47,27 +50,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
         body: jsonEncode(userData),
       );
 
-      final responseData = jsonDecode(response.body);
-
+      final data = jsonDecode(response.body);
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final userId = responseData['userId'];
+        final userId = data['userId'];
+        final token = data['token'];
 
+        // Stockage local
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('user_id', userId);
-        await prefs.setString('user_data', jsonEncode(userData));
+        await prefs.setString('fullname', userData['fullname'] ?? '');
+        await prefs.setString('email', userData['email'] ?? '');
+        await prefs.setString('phone', userData['phone'] ?? '');
+        await prefs.setString('role', userData['role'] ?? '');
+
+        // Stockage sécurisé du token
+        if (token != null) {
+          await storage.write(key: 'jwt_token', value: token);
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inscription réussie ✅')),
+          const SnackBar(content: Text("Inscription réussie ✅")),
         );
 
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) Navigator.pop(context);
       } else {
-        debugPrint("Erreur: ${response.statusCode} => $responseData");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(responseData['message'] ?? 'Erreur d\'inscription')),
+          SnackBar(content: Text(data['message'] ?? 'Erreur d\'inscription')),
         );
       }
     } catch (e) {
@@ -79,6 +88,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  InputDecoration _inputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      prefixIcon: Icon(icon),
+      hintText: hint,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+    );
+  }
+
   @override
   void dispose() {
     fullnameCtrl.dispose();
@@ -87,15 +105,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     passwordCtrl.dispose();
     confirmCtrl.dispose();
     super.dispose();
-  }
-
-  InputDecoration _inputDecoration(String hint, IconData icon) {
-    return InputDecoration(
-      prefixIcon: Icon(icon),
-      hintText: hint,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-    );
   }
 
   @override
@@ -142,7 +151,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Nom complet
                 TextFormField(
                   controller: fullnameCtrl,
                   decoration: _inputDecoration("Nom complet", Icons.person),
@@ -151,7 +159,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Email
                 TextFormField(
                   controller: emailCtrl,
                   decoration: _inputDecoration("Email", Icons.email),
@@ -160,7 +167,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Téléphone
                 Row(
                   children: [
                     Container(
@@ -182,10 +188,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         decoration: _inputDecoration("Téléphone", Icons.phone)
                             .copyWith(counterText: ""),
                         validator: (value) {
-                          if (value == null || value.isEmpty)
+                          if (value == null || value.isEmpty) {
                             return "Le téléphone est requis";
-                          if (!phoneRegex.hasMatch(value))
+                          }
+                          if (!phoneRegex.hasMatch(value)) {
                             return "Format: 05/06/07XXXXXXXX";
+                          }
                           return null;
                         },
                       ),
@@ -194,7 +202,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Mot de passe
                 TextFormField(
                   controller: passwordCtrl,
                   obscureText: !showPassword,
@@ -213,7 +220,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Confirmation mot de passe
                 TextFormField(
                   controller: confirmCtrl,
                   obscureText: !showConfirmPassword,
