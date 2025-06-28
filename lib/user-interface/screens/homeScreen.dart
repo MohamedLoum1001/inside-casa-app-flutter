@@ -1,15 +1,15 @@
-// ignore_for_file: no_leading_underscores_for_local_identifiers, use_build_context_synchronously
+// ignore_for_file: no_leading_underscores_for_local_identifiers, use_build_context_synchronously, file_names
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:inside_casa_app/user-interface/auth/login/LoginScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/CreateAccountScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/DiscoveryScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/FavoritesScreen.dart';
-// import 'package:inside_casa_app/user-interface/screens/LoginScreen.dart'; // <-- Import LoginScreen
 import 'package:inside_casa_app/user-interface/screens/ProfileScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ReservationsHistoryScreen.dart';
-import 'package:inside_casa_app/user-interface/screens/ReviewScreen.dart';
-import 'package:inside_casa_app/user-interface/screens/ShareScreen.dart';
+// import 'package:inside_casa_app/user-interface/screens/ReviewScreen.dart';
+// import 'package:inside_casa_app/user-interface/screens/ShareScreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -23,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   int? userId;
   String? jwtToken;
+  String fullName = "Nom Prénom";
+  File? profileImageFile;
   bool isLoading = true;
 
   @override
@@ -33,9 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('profile_image_path');
     setState(() {
       userId = prefs.getInt('user_id');
       jwtToken = prefs.getString('jwt_token');
+      fullName = prefs.getString('fullname') ?? "Nom Prénom";
+      if (path != null) profileImageFile = File(path);
       isLoading = false;
     });
   }
@@ -46,14 +51,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
-    await prefs.remove('user_id');
-    Navigator.pop(context); // Fermer le drawer
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Déconnexion"),
+        content: const Text("Voulez-vous vraiment vous déconnecter ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("Annuler"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text("Oui"),
+          ),
+        ],
+      ),
     );
+
+    if (confirm == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('jwt_token');
+      await prefs.remove('user_id');
+      await prefs.remove('fullname');
+      await prefs.remove('profile_image_path');
+      Navigator.pop(context); // Fermer le drawer si ouvert
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
   }
 
   @override
@@ -66,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final List<Widget> _mainPages = [
       const DiscoveryScreen(),
-      const FavoritesScreen(),
+      if (userId != null && jwtToken != null)
+        FavoritesScreen(userId: userId!, jwtToken: jwtToken!)
+      else
+        const Center(child: Text("Erreur d'identification")),
       if (userId != null && jwtToken != null)
         ReservationsHistoryScreen(userId: userId!, jwtToken: jwtToken!)
       else
@@ -85,21 +115,23 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Color(0xFFfdcf00)),
-              child: Text('Menu',
-                  style: TextStyle(fontSize: 24, color: Colors.white)),
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFFfdcf00)),
+              accountName: Text(fullName,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              accountEmail: null,
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: Colors.white,
+                backgroundImage: profileImageFile != null
+                    ? FileImage(profileImageFile!)
+                    : null,
+                child: profileImageFile == null
+                    ? const Icon(Icons.person,
+                        size: 50, color: Color(0xFFfdcf00))
+                    : null,
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.star),
-              title: const Text("Mes avis & notes"),
-              onTap: () => _navigateToDrawerPage(const ReviewScreen()),
-            ),
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text("Partager l'app"),
-              onTap: () => _navigateToDrawerPage(const ShareScreen()),
-            ),
+            
             ListTile(
               leading: const Icon(Icons.person_add),
               title: const Text("Modifier mon compte"),
