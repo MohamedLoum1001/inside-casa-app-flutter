@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inside_casa_app/user-interface/screens/SelectPaymentMethodScreen.dart';
 
 class PaymentValidationScreen extends StatelessWidget {
   final VoidCallback onPaymentConfirmed;
@@ -50,7 +51,13 @@ class PaymentValidationScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    onPaymentConfirmed();
+                    // Redirection vers la page de sélection du mode de paiement
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SelectPaymentMethodScreen(),
+                      ),
+                    );
                   },
                 ),
               ),

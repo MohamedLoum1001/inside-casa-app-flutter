@@ -1,58 +1,69 @@
-import 'package:flutter/material.dart';
+// ignore_for_file: file_names
 
-class MobilePaymentScreen extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:inside_casa_app/user-interface/screens/InwiMoneyForm.dart';
+import 'package:inside_casa_app/user-interface/screens/MobicashForm.dart';
+import 'package:inside_casa_app/user-interface/screens/OrangeMoneyForm.dart';
+// import 'package:inside_casa_app/user-interface/payments/OrangeMoneyForm.dart';
+// import 'package:inside_casa_app/user-interface/payments/InwiMoneyForm.dart';
+// import 'package:inside_casa_app/user-interface/payments/MobicashForm.dart';
+
+class MobilePaymentScreen extends StatelessWidget {
   const MobilePaymentScreen({super.key});
 
-  @override
-  State<MobilePaymentScreen> createState() => _MobilePaymentScreenState();
-}
+  void _navigateToOperatorForm(BuildContext context, String operator) {
+    Widget formScreen;
 
-class _MobilePaymentScreenState extends State<MobilePaymentScreen> {
-  final _phoneController = TextEditingController();
+    switch (operator) {
+      case "Orange":
+        formScreen = const OrangeMoneyForm();
+        break;
+      case "Inwi":
+        formScreen = const InwiMoneyForm();
+        break;
+      case "Mobicash":
+        formScreen = const MobicashForm();
+        break;
+      default:
+        return;
+    }
 
-  void _simulatePayment() {
-    final phone = _phoneController.text;
-    if (phone.isEmpty) return;
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Paiement en cours..."),
-        content: Text("Paiement mobile simulé pour le numéro : $phone"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
-          ),
-        ],
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => formScreen),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Paiement Mobile")),
-      body: Padding(
+      appBar: AppBar(
+        title: const Text("Paiement mobile local"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+      ),
+      body: ListView(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(
-              controller: _phoneController,
-              decoration: const InputDecoration(
-                labelText: "Numéro de téléphone",
-                prefixText: "+221 ",
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _simulatePayment,
-              icon: const Icon(Icons.payment),
-              label: const Text("Payer"),
-            )
-          ],
-        ),
+        children: [
+          const Text("Choisissez votre opérateur mobile :",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 24),
+          ListTile(
+            leading: const Icon(Icons.phone_android, color: Colors.orange),
+            title: const Text("Orange Money"),
+            onTap: () => _navigateToOperatorForm(context, "Orange"),
+          ),
+          ListTile(
+            leading: const Icon(Icons.phone_android, color: Colors.blue),
+            title: const Text("Inwi Money"),
+            onTap: () => _navigateToOperatorForm(context, "Inwi"),
+          ),
+          ListTile(
+            leading: const Icon(Icons.phone_android, color: Colors.green),
+            title: const Text("Maroc Telecom Mobicash"),
+            onTap: () => _navigateToOperatorForm(context, "Mobicash"),
+          ),
+        ],
       ),
     );
   }
