@@ -1,5 +1,3 @@
-// ignore_for_file: use_build_context_synchronously, file_names
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -26,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool showPassword = false;
   bool showConfirmPassword = false;
   bool isLoading = false;
+  String selectedRole = 'Utilisateur';
 
   final storage = const FlutterSecureStorage();
 
@@ -41,7 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'email': emailCtrl.text.trim(),
       'phone': '+212${phoneCtrl.text.trim().substring(1)}',
       'password': passwordCtrl.text.trim(),
-      'role': 'customer', // ✅ Rôle défini en dur
+      'role': selectedRole == 'Utilisateur' ? 'customer' : 'partner',
     };
 
     try {
@@ -56,6 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final userId = data['userId'];
         final token = data['token'];
 
+        // Stockage local
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('user_id', userId);
         await prefs.setString('fullname', userData['fullname'] ?? '');
@@ -63,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await prefs.setString('phone', userData['phone'] ?? '');
         await prefs.setString('role', userData['role'] ?? '');
 
+        // Stockage sécurisé du token
         if (token != null) {
           await storage.write(key: 'jwt_token', value: token);
         }
@@ -128,7 +129,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fontSize: 14, color: Colors.black54)),
                 const SizedBox(height: 20),
 
-                // Nom complet
+                // Rôle
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: DropdownButton<String>(
+                    value: selectedRole,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'Utilisateur', child: Text('Utilisateur')),
+                      DropdownMenuItem(
+                          value: 'Partenaire', child: Text('Partenaire')),
+                    ],
+                    onChanged: (value) => setState(() => selectedRole = value!),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 TextFormField(
                   controller: fullnameCtrl,
                   decoration: _inputDecoration("Nom complet", Icons.person),
@@ -137,7 +159,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Email
                 TextFormField(
                   controller: emailCtrl,
                   decoration: _inputDecoration("Email", Icons.email),
@@ -146,7 +167,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Téléphone
                 Row(
                   children: [
                     Container(
@@ -182,7 +202,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Mot de passe
                 TextFormField(
                   controller: passwordCtrl,
                   obscureText: !showPassword,
@@ -201,7 +220,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Confirmation mot de passe
                 TextFormField(
                   controller: confirmCtrl,
                   obscureText: !showConfirmPassword,
