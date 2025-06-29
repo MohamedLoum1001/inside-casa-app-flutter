@@ -2,15 +2,14 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:inside_casa_app/user-interface/auth/login/LoginScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/CreateAccountScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/DiscoveryScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/FavoritesScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ProfileScreen.dart';
 import 'package:inside_casa_app/user-interface/screens/ReservationsHistoryScreen.dart';
-// import 'package:inside_casa_app/user-interface/screens/ReviewScreen.dart';
-// import 'package:inside_casa_app/user-interface/screens/ShareScreen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,11 +35,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('profile_image_path');
+    final name = prefs.getString('fullname');
+
+    print("📦 Nom récupéré : $name");
+    print("📷 Chemin image : $path");
+
     setState(() {
       userId = prefs.getInt('user_id');
       jwtToken = prefs.getString('jwt_token');
-      fullName = prefs.getString('fullname') ?? "Nom Prénom";
-      if (path != null) profileImageFile = File(path);
+      fullName = name ?? "Nom Prénom";
+      if (path != null && File(path).existsSync()) {
+        profileImageFile = File(path);
+      }
       isLoading = false;
     });
   }
@@ -71,11 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirm == true) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('jwt_token');
-      await prefs.remove('user_id');
-      await prefs.remove('fullname');
-      await prefs.remove('profile_image_path');
-      Navigator.pop(context); // Fermer le drawer si ouvert
+      await prefs.clear();
+
+      Navigator.pop(context); // Fermer le drawer
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -117,21 +121,21 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(color: Color(0xFFfdcf00)),
-              accountName: Text(fullName,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              accountEmail: null,
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                backgroundImage: profileImageFile != null
-                    ? FileImage(profileImageFile!)
-                    : null,
-                child: profileImageFile == null
-                    ? const Icon(Icons.person,
-                        size: 50, color: Color(0xFFfdcf00))
-                    : null,
+              accountName: Text(
+                fullName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
+              accountEmail: null,
+              currentAccountPicture: profileImageFile != null
+                  ? CircleAvatar(
+                      backgroundImage: FileImage(profileImageFile!),
+                    )
+                  : const CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person,
+                          size: 50, color: Color(0xFFfdcf00)),
+                    ),
             ),
-            
             ListTile(
               leading: const Icon(Icons.person_add),
               title: const Text("Modifier mon compte"),
